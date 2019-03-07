@@ -1,7 +1,13 @@
+// iconv_wrap.hpp --- iconv wrapper class
+// Copyright (C) 2019 Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>
+// This file is public domain software.
+
 #ifndef ICONV_WRAP_HPP_
-#define ICONV_WRAP_HPP_     1   // Version 1
+#define ICONV_WRAP_HPP_     2   // Version 2
 
 #include <iconv.h>
+
+//////////////////////////////////////////////////////////////////////////////
 
 class iconv_wrap
 {
@@ -16,12 +22,15 @@ public:
 
     operator iconv_t() const;
 
-    bool convert(const void *input, size_t *in_left, void *output, size_t *out_left);
+    bool convert(const void *input, size_t *in_left,
+                 void *output, size_t *out_left);
     void reset();
 
 protected:
     iconv_t m_cd;
 };
+
+//////////////////////////////////////////////////////////////////////////////
 
 inline iconv_wrap::iconv_wrap() : m_cd((iconv_t)-1)
 {
@@ -82,5 +91,7 @@ inline void iconv_wrap::reset()
 {
     iconv(m_cd, NULL, NULL, NULL, NULL);
 }
+
+//////////////////////////////////////////////////////////////////////////////
 
 #endif  // ndef ICONV_WRAP_HPP_
