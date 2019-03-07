@@ -7,10 +7,7 @@
 #include <string>
 
 std::string  unquote(const char *str);
-
-#ifdef _WIN32
-    std::wstring unquote(const wchar_t *str);
-#endif
+std::wstring unquote(const wchar_t *str);
 
 #if __cplusplus >= 201103L  // C++11
     std::u16string unquote(const char16_t *str);
