@@ -38,7 +38,7 @@ if (SHIFT_JIS)
     add_definitions(-DSHIFT_JIS)
 endif()
 
-# ICU library
+# iconv library
 find_package(Iconv)
 include_directories(${Iconv_INCLUDE_DIRS})
 
