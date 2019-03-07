@@ -31,40 +31,27 @@ endif()
 #set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
 #set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR})
 
-if (WIN32)
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        # using Clang
-        set(CMAKE_C_FLAGS "-static")
-        set(CMAKE_CXX_FLAGS "-static")
-    elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        # using GCC
-        set(CMAKE_C_FLAGS "-static -static-libgcc -static-libstdc++")
-        set(CMAKE_CXX_FLAGS "-static -static-libgcc -static-libstdc++")
-    elseif (MSVC)
-        # replace "/MD" with "/MT" (building without runtime DLLs)
-        set(CompilerFlags
-            CMAKE_C_FLAGS
-            CMAKE_C_FLAGS_DEBUG
-            CMAKE_C_FLAGS_RELEASE
-            CMAKE_C_FLAGS_RELWITHDEBINFO
-            CMAKE_CXX_FLAGS
-            CMAKE_CXX_FLAGS_DEBUG
-            CMAKE_CXX_FLAGS_RELEASE
-            CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-        foreach(CompilerFlags ${CompilerFlags})
-            string(REPLACE "/MD" "/MT" ${CompilerFlags} "${${CompilerFlags}}")
-        endforeach()
-    endif()
+##############################################################################
+
+option(SHIFT_JIS "Use Shift_JIS" OFF)
+if (SHIFT_JIS)
+    add_definitions(-DSHIFT_JIS)
 endif()
 
-##############################################################################
+# ICU library
+find_package(Iconv)
+include_directories(${Iconv_INCLUDE_DIRS})
 
 # libunquote.a
 add_library(unquote STATIC unquote.cpp)
+if (Iconv_FOUND)
+    target_compile_definitions(unquote PRIVATE -DHAVE_ICONV)
+endif()
+target_link_libraries(unquote PRIVATE ${Iconv_LIBRARIES})
 
 # unquote-unittest.exe
-add_executable(unquote-unittest unquote.cpp)
-target_compile_definitions(unquote-unittest PRIVATE -DUNQUOTE_UNITTEST)
+add_executable(unquote-unittest unquote_unittest.cpp)
+target_link_libraries(unquote-unittest PRIVATE unquote ${Iconv_LIBRARIES})
 
 # tests
 add_test(NAME unquote-test COMMAND $<TARGET_FILE:unquote-unittest>)

@@ -3,7 +3,9 @@
 // This file is public domain software.
 
 #include "unquote.hpp"
-
+#ifdef HAVE_ICONV
+    #include "iconv_wrap.hpp"
+#endif
 #ifdef _WIN32
     #include <windows.h>
 #endif
@@ -37,6 +39,120 @@ inline bool unquote_isspace(T_CHAR ch)
         return false;
     }
 }
+
+template <typename T_CHAR>
+void unquote_store_utf16(std::basic_string<T_CHAR>& ret, int ch);
+
+template <>
+void unquote_store_utf16<wchar_t>(std::basic_string<wchar_t>& ret, int ch)
+{
+    ret += wchar_t(ch);
+}
+
+#if defined(_WIN32) || defined(HAVE_ICONV)
+    template <>
+    void unquote_store_utf16<char>(std::basic_string<char>& ret, int ch)
+    {
+        wchar_t wch = wchar_t(ch);
+        char out[16] = { 0 };
+    #ifdef _WIN32
+        WideCharToMultiByte(CP_ACP, 0, &wch, 1, out, 8, NULL, NULL);
+    #elif defined(HAVE_ICONV)
+        #ifdef SHIFT_JIS
+            static iconv_wrap ic("SHIFT_JIS", "WCHAR_T");
+        #else
+            static iconv_wrap ic("UTF-8", "WCHAR_T");
+        #endif
+        ic.reset();
+        size_t in_left = sizeof(wch);
+        size_t out_left = sizeof(out);
+        ic.convert(&wch, &in_left, out, &out_left);
+    #endif
+        for (char *q = out; *q; ++q)
+        {
+            ret += char(*q);
+        }
+    }
+#endif
+
+template <typename T_CHAR>
+void unquote_store_utf32(std::basic_string<T_CHAR>& ret, long ch);
+
+#ifdef HAVE_ICONV
+    template <>
+    void unquote_store_utf32(std::basic_string<char>& ret, long ch)
+    {
+#ifdef SHIFT_JIS
+        static iconv_wrap ic("SHIFT_JIS", "UTF-32");
+#else
+        static iconv_wrap ic("UTF-8", "UTF-32");
+#endif
+        ic.reset();
+        char32_t uch = char32_t(ch);
+        char out[16] = { 0 };
+        size_t in_left = sizeof(uch);
+        size_t out_left = sizeof(out);
+        ic.convert(&uch, &in_left, out, &out_left);
+        for (char *q = out; *q; ++q)
+        {
+            ret += char(*q);
+        }
+    }
+
+    template <>
+    void unquote_store_utf32(std::basic_string<wchar_t>& ret, long ch)
+    {
+        static iconv_wrap ic("WCHAR_T", "UTF-32");
+        ic.reset();
+        char32_t uch = char32_t(ch);
+        char out[16] = { 0 };
+        size_t in_left = sizeof(uch);
+        size_t out_left = sizeof(out);
+        ic.convert(&uch, &in_left, out, &out_left);
+        for (char *q = out; *q; ++q)
+        {
+            ret += char(*q);
+        }
+    }
+
+    #if __cplusplus >= 201103L  // C++11
+        template <>
+        void unquote_store_utf32(std::basic_string<char16_t>& ret, long ch)
+        {
+            static iconv_wrap ic("UTF-16", "UTF-32");
+            ic.reset();
+            char32_t uch = char32_t(ch);
+            char out[16] = { 0 };
+            size_t in_left = sizeof(uch);
+            size_t out_left = sizeof(out);
+            ic.convert(&uch, &in_left, out, &out_left);
+            for (char *q = out; *q; ++q)
+            {
+                ret += char(*q);
+            }
+        }
+    #endif
+#endif
+
+#if __cplusplus >= 201103L  // C++11
+    template <>
+    void unquote_store_utf16<char16_t>(std::basic_string<char16_t>& ret, int ch)
+    {
+        ret += char16_t(ch);
+    }
+
+    template <>
+    void unquote_store_utf16<char32_t>(std::basic_string<char32_t>& ret, int ch)
+    {
+        ret += char32_t(ch);
+    }
+
+    template <>
+    void unquote_store_utf32<char32_t>(std::basic_string<char32_t>& ret, long ch)
+    {
+        ret += char32_t(ch);
+    }
+#endif
 
 template <typename T_CHAR>
 std::basic_string<T_CHAR>
@@ -132,6 +248,7 @@ unquote_generic(const T_CHAR *str)
                     --pch;
                 }
                 break;
+#if defined(HAVE_ICONV) || defined(_WIN32)
             case 'u':
                 {
                     std::string hex;
@@ -143,26 +260,13 @@ unquote_generic(const T_CHAR *str)
                         ++pch;
                         ++i;
                     }
-                    wchar_t uni = wchar_t(strtoul(hex.c_str(), NULL, 16));
-#ifdef _WIN32
-                    if (sizeof(T_CHAR) == 1 && uni >= 0x7F)
-                    {
-                        char sz[8] = { 0 };
-                        WideCharToMultiByte(CP_ACP, 0, &uni, 1, sz, 8, NULL, NULL);
-                        for (char *q = sz; *q; ++q)
-                        {
-                            ret += T_CHAR(*q);
-                        }
-                    }
-                    else
-#endif
-                    {
-                        ret += T_CHAR(uni);
-                    }
+                    int utf16 = int(strtoul(hex.c_str(), NULL, 16));
+                    unquote_store_utf16<T_CHAR>(ret, utf16);
                     --pch;
                 }
                 break;
-#ifndef _WIN32
+#endif
+#ifdef HAVE_ICONV
             case 'U':
                 {
                     std::string hex;
@@ -174,8 +278,8 @@ unquote_generic(const T_CHAR *str)
                         ++pch;
                         ++i;
                     }
-                    T_CHAR uni = (T_CHAR)strtoul(hex.c_str(), NULL, 16);
-                    ret += uni;
+                    long utf32 = (long)strtoul(hex.c_str(), NULL, 16);
+                    unquote_store_utf32<T_CHAR>(ret, utf32);
                     --pch;
                 }
                 break;
@@ -205,6 +309,18 @@ std::wstring unquote(const wchar_t *str)
     return unquote_generic<wchar_t>(str);
 }
 
+#if __cplusplus >= 201103L
+    std::u16string unquote(const char16_t *str)
+    {
+        return unquote_generic<char16_t>(str);
+    }
+
+    std::u32string unquote(const char32_t *str)
+    {
+        return unquote_generic<char32_t>(str);
+    }
+#endif
+
 void unquote_unittest(void)
 {
     assert(unquote("\"\"") == "");
@@ -214,7 +330,6 @@ void unquote_unittest(void)
     assert(unquote("\"\\x2\"") == "\x02");
     assert(unquote("\"\\x02\"") == "\x02");
     assert(unquote("\"\\x22\" \"BBB\"") == "\x22" "BBB");
-    assert(unquote("\"\\u0002\"") == "\u0002");
     assert(unquote("\"A\"") == "A");
     assert(unquote("\"ABC\"") == "ABC");
     assert(unquote("   \"ABC\"  ") == "ABC");
@@ -230,43 +345,40 @@ void unquote_unittest(void)
     assert(unquote("\"Hello,\nworld!\\r\\n\"") == "Hello,\nworld!\r\n");
     assert(unquote("\"This\\nis\\na\\ntest.\"") == "This\nis\na\ntest.");
 
-    assert(unquote(L"\"\"") == L"");
-    assert(unquote(L"\"\\2\"") == L"\x02");
-    assert(unquote(L"\"\\02\"") == L"\x02");
-    assert(unquote(L"\"\\002\"") == L"\x02");
-    assert(unquote(L"\"\\x2\"") == L"\x02");
-    assert(unquote(L"\"\\x02\"") == L"\x02");
-    assert(unquote(L"\"\\x22\" \"BBB\"") == L"\x22" L"BBB");
-    assert(unquote(L"\"\\u0002\"") == L"\u0002");
-    assert(unquote(L"\"A\"") == L"A");
-    assert(unquote(L"\"ABC\"") == L"ABC");
-    assert(unquote(L"   \"ABC\"  ") == L"ABC");
-    assert(unquote(L"   \"ABC  ") == L"ABC  ");
-    assert(unquote(L"   \"A\" \"BC\"  ") == L"ABC");
-    assert(unquote(L"\"\\001\"") == L"\x01");
-    assert(unquote(L"\"\\010\"") == L"\x08");
-    assert(unquote(L"\"\\100\"") == L"\x40");
-    assert(unquote(L"\"\\007ABC\"") == L"\x07" L"ABC");
-    assert(unquote(L"\"\\x20\"") == L"\x20");
-    assert(unquote(L"\"\\x40\"") == L"\x40");
-    assert(unquote(L"\"hello\\r\\n\"") == L"hello\r\n");
-    assert(unquote(L"\"Hello,\nworld!\\r\\n\"") == L"Hello,\nworld!\r\n");
-    assert(unquote(L"\"This\\nis\\na\\ntest.\"") == L"This\nis\na\ntest.");
+    assert(unquote(u"\"\"") == u"");
+    assert(unquote(u"\"\\2\"") == u"\x02");
+    assert(unquote(u"\"\\02\"") == u"\x02");
+    assert(unquote(u"\"\\002\"") == u"\x02");
+    assert(unquote(u"\"\\x2\"") == u"\x02");
+    assert(unquote(u"\"\\x02\"") == u"\x02");
+    assert(unquote(u"\"\\x22\" \"BBB\"") == u"\x22" u"BBB");
+    assert(unquote(u"\"A\"") == u"A");
+    assert(unquote(u"\"ABC\"") == u"ABC");
+    assert(unquote(u"   \"ABC\"  ") == u"ABC");
+    assert(unquote(u"   \"ABC  ") == u"ABC  ");
+    assert(unquote(u"   \"A\" \"BC\"  ") == u"ABC");
+    assert(unquote(u"\"\\001\"") == u"\x01");
+    assert(unquote(u"\"\\010\"") == u"\x08");
+    assert(unquote(u"\"\\100\"") == u"\x40");
+    assert(unquote(u"\"\\007ABC\"") == u"\x07" u"ABC");
+    assert(unquote(u"\"\\x20\"") == u"\x20");
+    assert(unquote(u"\"\\x40\"") == u"\x40");
+    assert(unquote(u"\"hello\\r\\n\"") == u"hello\r\n");
+    assert(unquote(u"\"Hello,\nworld!\\r\\n\"") == u"Hello,\nworld!\r\n");
+    assert(unquote(u"\"This\\nis\\na\\ntest.\"") == u"This\nis\na\ntest.");
 
-#if defined(JAPAN) && defined(_WIN32)
-    puts("japan");
-    // Hiragana A I U
+#if defined(HAVE_ICONV) || defined(_WIN32)
+    puts("UTF-16");
+    assert(unquote("\"\\u0002\"") == "\u0002");
+    assert(unquote(u"\"\\u0002\"") == u"\u0002");
+    assert(unquote(L"\"\\u0002\"") == L"\u0002");
+    assert(unquote(u"\"\\u3042\\u3044\\u3046\"") == u"\u3042\u3044\u3046");
+#endif
+
+#if (defined(HAVE_ICONV) || defined(_WIN32)) && defined(SHIFT_JIS)
+    puts("SHIFT_JIS");
     assert(unquote("\"\\u3042\\u3044\\u3046\"") == "\x82\xA0\x82\xA2\x82\xA4");
-    assert(unquote(L"\"\\u3042\\u3044\\u3046\"") == L"\u3042\u3044\u3046");
 #endif
 
     puts("OK");
 }
-
-#ifdef UNQUOTE_UNITTEST
-int main(void)
-{
-    unquote_unittest();
-    return 0;
-}
-#endif
