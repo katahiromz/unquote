@@ -324,10 +324,12 @@ std::wstring unquote(const wchar_t *str)
 }
 
 #if __cplusplus >= 201103L
-    std::u16string unquote(const char16_t *str)
-    {
-        return unquote_generic<char16_t>(str);
-    }
+    #if defined(HAVE_ICONV) || defined(_WIN32)
+        std::u16string unquote(const char16_t *str)
+        {
+            return unquote_generic<char16_t>(str);
+        }
+    #endif
 
     #ifdef HAVE_ICONV
         std::u32string unquote(const char32_t *str)
@@ -361,27 +363,31 @@ void unquote_unittest(void)
     assert(unquote("\"Hello,\nworld!\\r\\n\"") == "Hello,\nworld!\r\n");
     assert(unquote("\"This\\nis\\na\\ntest.\"") == "This\nis\na\ntest.");
 
-    assert(unquote(u"\"\"") == u"");
-    assert(unquote(u"\"\\2\"") == u"\x02");
-    assert(unquote(u"\"\\02\"") == u"\x02");
-    assert(unquote(u"\"\\002\"") == u"\x02");
-    assert(unquote(u"\"\\x2\"") == u"\x02");
-    assert(unquote(u"\"\\x02\"") == u"\x02");
-    assert(unquote(u"\"\\x22\" \"BBB\"") == u"\x22" u"BBB");
-    assert(unquote(u"\"A\"") == u"A");
-    assert(unquote(u"\"ABC\"") == u"ABC");
-    assert(unquote(u"   \"ABC\"  ") == u"ABC");
-    assert(unquote(u"   \"ABC  ") == u"ABC  ");
-    assert(unquote(u"   \"A\" \"BC\"  ") == u"ABC");
-    assert(unquote(u"\"\\001\"") == u"\x01");
-    assert(unquote(u"\"\\010\"") == u"\x08");
-    assert(unquote(u"\"\\100\"") == u"\x40");
-    assert(unquote(u"\"\\007ABC\"") == u"\x07" u"ABC");
-    assert(unquote(u"\"\\x20\"") == u"\x20");
-    assert(unquote(u"\"\\x40\"") == u"\x40");
-    assert(unquote(u"\"hello\\r\\n\"") == u"hello\r\n");
-    assert(unquote(u"\"Hello,\nworld!\\r\\n\"") == u"Hello,\nworld!\r\n");
-    assert(unquote(u"\"This\\nis\\na\\ntest.\"") == u"This\nis\na\ntest.");
+#if __cplusplus >= 201103L
+    #if defined(HAVE_ICONV) || defined(_WIN32)
+        assert(unquote(u"\"\"") == u"");
+        assert(unquote(u"\"\\2\"") == u"\x02");
+        assert(unquote(u"\"\\02\"") == u"\x02");
+        assert(unquote(u"\"\\002\"") == u"\x02");
+        assert(unquote(u"\"\\x2\"") == u"\x02");
+        assert(unquote(u"\"\\x02\"") == u"\x02");
+        assert(unquote(u"\"\\x22\" \"BBB\"") == u"\x22" u"BBB");
+        assert(unquote(u"\"A\"") == u"A");
+        assert(unquote(u"\"ABC\"") == u"ABC");
+        assert(unquote(u"   \"ABC\"  ") == u"ABC");
+        assert(unquote(u"   \"ABC  ") == u"ABC  ");
+        assert(unquote(u"   \"A\" \"BC\"  ") == u"ABC");
+        assert(unquote(u"\"\\001\"") == u"\x01");
+        assert(unquote(u"\"\\010\"") == u"\x08");
+        assert(unquote(u"\"\\100\"") == u"\x40");
+        assert(unquote(u"\"\\007ABC\"") == u"\x07" u"ABC");
+        assert(unquote(u"\"\\x20\"") == u"\x20");
+        assert(unquote(u"\"\\x40\"") == u"\x40");
+        assert(unquote(u"\"hello\\r\\n\"") == u"hello\r\n");
+        assert(unquote(u"\"Hello,\nworld!\\r\\n\"") == u"Hello,\nworld!\r\n");
+        assert(unquote(u"\"This\\nis\\na\\ntest.\"") == u"This\nis\na\ntest.");
+    #endif
+#endif
 
 #if defined(HAVE_ICONV) || defined(_WIN32)
     puts("UCS-2-INTERNAL");
