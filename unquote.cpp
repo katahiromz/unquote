@@ -36,12 +36,8 @@ inline bool unquote_isspace(T_CHAR ch)
 {
     switch (ch)
     {
-    case T_CHAR(' '):
-    case T_CHAR('\t'):
-    case T_CHAR('\n'):
-    case T_CHAR('\r'):
-    case T_CHAR('\f'):
-    case T_CHAR('\v'):
+    case T_CHAR(' '): case T_CHAR('\t'): case T_CHAR('\n'):
+    case T_CHAR('\r'): case T_CHAR('\f'): case T_CHAR('\v'):
         return true;
     default:
         return false;

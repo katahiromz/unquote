@@ -2,7 +2,7 @@
 // Copyright (C) 2019 Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>
 // This file is public domain software.
 #ifndef UNQUOTE_HPP_
-#define UNQUOTE_HPP_    4   // Version 4
+#define UNQUOTE_HPP_    5   // Version 5
 
 #include <string>
 
