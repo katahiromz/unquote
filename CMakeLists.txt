@@ -54,6 +54,6 @@ add_executable(unquote-unittest unquote_unittest.cpp)
 target_link_libraries(unquote-unittest PRIVATE unquote ${Iconv_LIBRARIES})
 
 # tests
-add_test(NAME unquote-test COMMAND $<TARGET_FILE:unquote-unittest>)
+add_test(NAME unquote-unittest COMMAND $<TARGET_FILE:unquote-unittest>)
 
 ##############################################################################

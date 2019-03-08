@@ -11,6 +11,14 @@
 #endif
 #include <cassert>
 
+#ifndef UNQUOTE_CHARSET
+    #ifdef SHIFT_JIS
+        #define UNQUOTE_CHARSET "SHIFT_JIS"
+    #else
+        #define UNQUOTE_CHARSET "CHAR"
+    #endif
+#endif
+
 template <typename T_CHAR>
 inline bool unquote_isxdigit(T_CHAR ch)
 {
@@ -58,15 +66,15 @@ void unquote_store_utf16<wchar_t>(std::basic_string<wchar_t>& ret, int ch)
     #ifdef _WIN32
         WideCharToMultiByte(CP_ACP, 0, &wch, 1, out, 8, NULL, NULL);
     #elif defined(HAVE_ICONV)
-        #ifdef SHIFT_JIS
-            static iconv_wrap s_ic("SHIFT_JIS", "WCHAR_T");
-        #else
-            static iconv_wrap s_ic("UTF-8", "WCHAR_T");
-        #endif
+        static iconv_wrap s_ic(UNQUOTE_CHARSET, "WCHAR_T");
         s_ic.reset();
         size_t in_left = sizeof(wch);
         size_t out_left = sizeof(out);
-        s_ic.convert(&wch, &in_left, out, &out_left);
+        if (!s_ic.convert(&wch, &in_left, out, &out_left))
+        {
+            ret += '?';
+            return;
+        }
     #endif
         for (char *q = out; *q; ++q)
         {
@@ -82,20 +90,20 @@ void unquote_store_utf32(std::basic_string<T_CHAR>& ret, long ch);
     template <>
     void unquote_store_utf32(std::basic_string<char>& ret, long ch)
     {
-#ifdef SHIFT_JIS
-        static iconv_wrap s_ic("SHIFT_JIS", "UCS-4-INTERNAL");
-#else
-        static iconv_wrap s_ic("UTF-8", "UCS-4-INTERNAL");
-#endif
+        static iconv_wrap s_ic(UNQUOTE_CHARSET, "UCS-4-INTERNAL");
         s_ic.reset();
         char32_t uch = char32_t(ch);
         char out[16] = { 0 };
         size_t in_left = sizeof(uch);
         size_t out_left = sizeof(out);
-        s_ic.convert(&uch, &in_left, out, &out_left);
+        if (!s_ic.convert(&uch, &in_left, out, &out_left))
+        {
+            ret += '?';
+            return;
+        }
         for (char *q = out; *q; ++q)
         {
-            ret += char(*q);
+            ret += *q;
         }
     }
 
@@ -108,7 +116,11 @@ void unquote_store_utf32(std::basic_string<T_CHAR>& ret, long ch);
         wchar_t out[16] = { 0 };
         size_t in_left = sizeof(uch);
         size_t out_left = sizeof(out);
-        s_ic.convert(&uch, &in_left, out, &out_left);
+        if (!s_ic.convert(&uch, &in_left, out, &out_left))
+        {
+            ret += wchar_t('?');
+            return;
+        }
         for (wchar_t *q = out; *q; ++q)
         {
             ret += *q;
@@ -125,7 +137,11 @@ void unquote_store_utf32(std::basic_string<T_CHAR>& ret, long ch);
             char16_t out[8] = { 0 };
             size_t in_left = sizeof(uch);
             size_t out_left = sizeof(out);
-            s_ic.convert(&uch, &in_left, out, &out_left);
+            if (!s_ic.convert(&uch, &in_left, out, &out_left))
+            {
+                ret += char16_t('?');
+                return;
+            }
             for (char16_t *q = out; *q; ++q)
             {
                 ret += *q;
@@ -151,7 +167,11 @@ void unquote_store_utf32(std::basic_string<T_CHAR>& ret, long ch);
             char32_t out[8] = { 0 };
             size_t in_left = sizeof(uch);
             size_t out_left = sizeof(out);
-            s_ic.convert(&uch, &in_left, out, &out_left);
+            if (!s_ic.convert(&uch, &in_left, out, &out_left))
+            {
+                ret += char32_t('?');
+                return;
+            }
             for (char32_t *q = out; *q; ++q)
             {
                 ret += *q;
