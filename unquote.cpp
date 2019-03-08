@@ -3,8 +3,6 @@
 // This file is public domain software.
 
 #include "unquote.hpp"
-//#undef _WIN32
-//#undef HAVE_ICONV
 #ifdef HAVE_ICONV
     #include "iconv_wrap.hpp"
 #endif
@@ -61,14 +59,14 @@ void unquote_store_utf16<wchar_t>(std::basic_string<wchar_t>& ret, int ch)
         WideCharToMultiByte(CP_ACP, 0, &wch, 1, out, 8, NULL, NULL);
     #elif defined(HAVE_ICONV)
         #ifdef SHIFT_JIS
-            static iconv_wrap ic("SHIFT_JIS", "WCHAR_T");
+            static iconv_wrap s_ic("SHIFT_JIS", "WCHAR_T");
         #else
-            static iconv_wrap ic("UTF-8", "WCHAR_T");
+            static iconv_wrap s_ic("UTF-8", "WCHAR_T");
         #endif
-        ic.reset();
+        s_ic.reset();
         size_t in_left = sizeof(wch);
         size_t out_left = sizeof(out);
-        ic.convert(&wch, &in_left, out, &out_left);
+        s_ic.convert(&wch, &in_left, out, &out_left);
     #endif
         for (char *q = out; *q; ++q)
         {
@@ -85,16 +83,16 @@ void unquote_store_utf32(std::basic_string<T_CHAR>& ret, long ch);
     void unquote_store_utf32(std::basic_string<char>& ret, long ch)
     {
 #ifdef SHIFT_JIS
-        static iconv_wrap ic("SHIFT_JIS", "UCS-4-INTERNAL");
+        static iconv_wrap s_ic("SHIFT_JIS", "UCS-4-INTERNAL");
 #else
-        static iconv_wrap ic("UTF-8", "UCS-4-INTERNAL");
+        static iconv_wrap s_ic("UTF-8", "UCS-4-INTERNAL");
 #endif
-        ic.reset();
+        s_ic.reset();
         char32_t uch = char32_t(ch);
         char out[16] = { 0 };
         size_t in_left = sizeof(uch);
         size_t out_left = sizeof(out);
-        ic.convert(&uch, &in_left, out, &out_left);
+        s_ic.convert(&uch, &in_left, out, &out_left);
         for (char *q = out; *q; ++q)
         {
             ret += char(*q);
@@ -104,13 +102,13 @@ void unquote_store_utf32(std::basic_string<T_CHAR>& ret, long ch);
     template <>
     void unquote_store_utf32(std::basic_string<wchar_t>& ret, long ch)
     {
-        static iconv_wrap ic("WCHAR_T", "UCS-4-INTERNAL");
-        ic.reset();
+        static iconv_wrap s_ic("WCHAR_T", "UCS-4-INTERNAL");
+        s_ic.reset();
         char32_t uch = char32_t(ch);
         wchar_t out[16] = { 0 };
         size_t in_left = sizeof(uch);
         size_t out_left = sizeof(out);
-        ic.convert(&uch, &in_left, out, &out_left);
+        s_ic.convert(&uch, &in_left, out, &out_left);
         for (wchar_t *q = out; *q; ++q)
         {
             ret += *q;
@@ -121,13 +119,13 @@ void unquote_store_utf32(std::basic_string<T_CHAR>& ret, long ch);
         template <>
         void unquote_store_utf32(std::basic_string<char16_t>& ret, long ch)
         {
-            static iconv_wrap ic("UCS-2-INTERNAL", "UCS-4-INTERNAL");
-            ic.reset();
+            static iconv_wrap s_ic("UCS-2-INTERNAL", "UCS-4-INTERNAL");
+            s_ic.reset();
             char32_t uch = char32_t(ch);
             char16_t out[8] = { 0 };
             size_t in_left = sizeof(uch);
             size_t out_left = sizeof(out);
-            ic.convert(&uch, &in_left, out, &out_left);
+            s_ic.convert(&uch, &in_left, out, &out_left);
             for (char16_t *q = out; *q; ++q)
             {
                 ret += *q;
@@ -147,13 +145,13 @@ void unquote_store_utf32(std::basic_string<T_CHAR>& ret, long ch);
         template <>
         void unquote_store_utf16<char32_t>(std::basic_string<char32_t>& ret, int ch)
         {
-            static iconv_wrap ic("UCS-4-INTERNAL", "UCS-2-INTERNAL");
-            ic.reset();
+            static iconv_wrap s_ic("UCS-4-INTERNAL", "UCS-2-INTERNAL");
+            s_ic.reset();
             char16_t uch = char16_t(ch);
             char32_t out[8] = { 0 };
             size_t in_left = sizeof(uch);
             size_t out_left = sizeof(out);
-            ic.convert(&uch, &in_left, out, &out_left);
+            s_ic.convert(&uch, &in_left, out, &out_left);
             for (char32_t *q = out; *q; ++q)
             {
                 ret += *q;
