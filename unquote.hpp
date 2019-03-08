@@ -9,9 +9,13 @@
 std::string  unquote(const char *str);
 std::wstring unquote(const wchar_t *str);
 
+//#undef HAVE_ICONV
+
 #if __cplusplus >= 201103L  // C++11
     std::u16string unquote(const char16_t *str);
-    std::u32string unquote(const char32_t *str);
+    #ifdef HAVE_ICONV
+        std::u32string unquote(const char32_t *str);
+    #endif
 #endif
 
 void unquote_unittest(void);

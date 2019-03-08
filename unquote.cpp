@@ -3,6 +3,8 @@
 // This file is public domain software.
 
 #include "unquote.hpp"
+//#undef _WIN32
+//#undef HAVE_ICONV
 #ifdef HAVE_ICONV
     #include "iconv_wrap.hpp"
 #endif
@@ -70,7 +72,7 @@ void unquote_store_utf16<wchar_t>(std::basic_string<wchar_t>& ret, int ch)
     #endif
         for (char *q = out; *q; ++q)
         {
-            ret += char(*q);
+            ret += *q;
         }
     }
 #endif
@@ -83,9 +85,9 @@ void unquote_store_utf32(std::basic_string<T_CHAR>& ret, long ch);
     void unquote_store_utf32(std::basic_string<char>& ret, long ch)
     {
 #ifdef SHIFT_JIS
-        static iconv_wrap ic("SHIFT_JIS", "UTF-32");
+        static iconv_wrap ic("SHIFT_JIS", "UCS-4-INTERNAL");
 #else
-        static iconv_wrap ic("UTF-8", "UTF-32");
+        static iconv_wrap ic("UTF-8", "UCS-4-INTERNAL");
 #endif
         ic.reset();
         char32_t uch = char32_t(ch);
@@ -102,16 +104,16 @@ void unquote_store_utf32(std::basic_string<T_CHAR>& ret, long ch);
     template <>
     void unquote_store_utf32(std::basic_string<wchar_t>& ret, long ch)
     {
-        static iconv_wrap ic("WCHAR_T", "UTF-32");
+        static iconv_wrap ic("WCHAR_T", "UCS-4-INTERNAL");
         ic.reset();
         char32_t uch = char32_t(ch);
-        char out[16] = { 0 };
+        wchar_t out[16] = { 0 };
         size_t in_left = sizeof(uch);
         size_t out_left = sizeof(out);
         ic.convert(&uch, &in_left, out, &out_left);
-        for (char *q = out; *q; ++q)
+        for (wchar_t *q = out; *q; ++q)
         {
-            ret += char(*q);
+            ret += *q;
         }
     }
 
@@ -119,16 +121,16 @@ void unquote_store_utf32(std::basic_string<T_CHAR>& ret, long ch);
         template <>
         void unquote_store_utf32(std::basic_string<char16_t>& ret, long ch)
         {
-            static iconv_wrap ic("UTF-16", "UTF-32");
+            static iconv_wrap ic("UCS-2-INTERNAL", "UCS-4-INTERNAL");
             ic.reset();
             char32_t uch = char32_t(ch);
-            char out[16] = { 0 };
+            char16_t out[8] = { 0 };
             size_t in_left = sizeof(uch);
             size_t out_left = sizeof(out);
             ic.convert(&uch, &in_left, out, &out_left);
-            for (char *q = out; *q; ++q)
+            for (char16_t *q = out; *q; ++q)
             {
-                ret += char(*q);
+                ret += *q;
             }
         }
     #endif
@@ -141,11 +143,23 @@ void unquote_store_utf32(std::basic_string<T_CHAR>& ret, long ch);
         ret += char16_t(ch);
     }
 
-    template <>
-    void unquote_store_utf16<char32_t>(std::basic_string<char32_t>& ret, int ch)
-    {
-        ret += char32_t(ch);
-    }
+    #ifdef HAVE_ICONV
+        template <>
+        void unquote_store_utf16<char32_t>(std::basic_string<char32_t>& ret, int ch)
+        {
+            static iconv_wrap ic("UCS-4-INTERNAL", "UCS-2-INTERNAL");
+            ic.reset();
+            char16_t uch = char16_t(ch);
+            char32_t out[8] = { 0 };
+            size_t in_left = sizeof(uch);
+            size_t out_left = sizeof(out);
+            ic.convert(&uch, &in_left, out, &out_left);
+            for (char32_t *q = out; *q; ++q)
+            {
+                ret += *q;
+            }
+        }
+    #endif
 
     template <>
     void unquote_store_utf32<char32_t>(std::basic_string<char32_t>& ret, long ch)
@@ -315,10 +329,12 @@ std::wstring unquote(const wchar_t *str)
         return unquote_generic<char16_t>(str);
     }
 
-    std::u32string unquote(const char32_t *str)
-    {
-        return unquote_generic<char32_t>(str);
-    }
+    #ifdef HAVE_ICONV
+        std::u32string unquote(const char32_t *str)
+        {
+            return unquote_generic<char32_t>(str);
+        }
+    #endif
 #endif
 
 void unquote_unittest(void)
@@ -368,11 +384,17 @@ void unquote_unittest(void)
     assert(unquote(u"\"This\\nis\\na\\ntest.\"") == u"This\nis\na\ntest.");
 
 #if defined(HAVE_ICONV) || defined(_WIN32)
-    puts("UTF-16");
-    assert(unquote("\"\\u0002\"") == "\u0002");
-    assert(unquote(u"\"\\u0002\"") == u"\u0002");
-    assert(unquote(L"\"\\u0002\"") == L"\u0002");
+    puts("UCS-2-INTERNAL");
+    assert(unquote(u"\"\\u3042\"") == u"\u3042");
+    assert(unquote(L"\"\\u3042\"") == L"\u3042");
     assert(unquote(u"\"\\u3042\\u3044\\u3046\"") == u"\u3042\u3044\u3046");
+#endif
+
+#ifdef HAVE_ICONV
+    puts("UCS-4-INTERNAL");
+    assert(unquote(U"\"\\u3042\"") == U"\u3042");
+    assert(unquote(U"\"\\U00003042\"") == U"\u3042");
+    assert(unquote(U"\"\\u3042\\u3044\\u3046\"") == U"\u3042\u3044\u3046");
 #endif
 
 #if (defined(HAVE_ICONV) || defined(_WIN32)) && defined(SHIFT_JIS)
